@@ -1,21 +1,21 @@
 package jp.blackawa;
 
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class App {
     public static void main( String[] args ) throws ClassNotFoundException, SQLException {
         Class.forName("oracle.jdbc.driver.OracleDriver");
         Connection conn = DriverManager.getConnection("jdbc:oracle:thin:@localhost:1521/xe", "TEST", "TEST");
 
-        // user_tab_columnsから自分が所有するテーブルのリストを取得する。
-        List<Table> tables = readTableList(conn);
+        // USER_TAB_COLUMNSの情報を取得してコレクションに変換する
+        Map<String, List<String>> tableList = loadUserTabColumns(conn);
 
-        // 各テーブルのカラムリストを取得する。
-        for (Table table : tables) {
-            readColumnOf(conn, table);
+        ///////////////////// Output for Testing ///////////////////////////
+        for (String key : tableList.keySet()) {
+            System.out.println(key + ": " + tableList.get(key).toString());
         }
+        ////////////////////////////////////////////////////////////////////
 
         // 全データをcsvファイルに吐き出す。
 
@@ -25,32 +25,26 @@ public class App {
     }
 
     /**
-     * 自身が所有するテーブル名のリストを取得する。
-     * @param conn データベースへの接続
-     * @return 自身が所有するテーブル名のリスト
-     * @throws SQLException データベースアクセス時の例外
+     * テーブル名とカラム名の一覧を取得し、それをリストとして返却する。
+     * @param conn データベース接続
+     * @return テーブル名をキー、そのテーブルが所有するカラム一覧を値に持つマップ
+     * @throws SQLException データベースアクセス時に発生しうる例外
      */
-    private static List<Table> readTableList(Connection conn) throws SQLException {
+    private static Map<String, List<String>> loadUserTabColumns(Connection conn) throws SQLException {
         Statement stmt = conn.createStatement();
-        ResultSet tables = stmt.executeQuery("select table_name from user_tab_columns group by table_name");
-        List<Table> tablesList = new ArrayList<>();
-        while (tables.next()) {
-            tablesList.add(new Table("TABLE_NAME"));
+        ResultSet rs = stmt.executeQuery("SELECT TABLE_NAME, COLUMN_NAME FROM USER_TAB_COLUMNS ORDER BY TABLE_NAME, COLUMN_NAME");
+        Map<String, List<String>> userTabColumnsMap = new HashMap<>();
+        // テーブルが持つカラムを全てまとめる
+        while (rs.next()) {
+            String tableName = rs.getString("TABLE_NAME");
+            String columnName = rs.getString("COLUMN_NAME");
+            List<String> columns = userTabColumnsMap.get(tableName);
+            if (columns == null) {
+                userTabColumnsMap.put(tableName, new ArrayList<>(Arrays.asList(columnName)));
+            } else {
+                columns.add(columnName);
+            }
         }
-        tables.close();
-        stmt.close();
-        return tablesList;
-    }
-
-    /**
-     * 与えられたテーブルが持つカラムのリストを取得する。
-     * @param conn データベースへの接続
-     * @param table テーブル
-     * @throws SQLException データベースアクセス時の例外
-     */
-    private static void readColumnOf(Connection conn, Table table) throws SQLException {
-        Statement stmt = conn.createStatement();
-        ResultSet columns = stmt.executeQuery("select column_name from user_tab_columns where table_name = " + table.getTableName());
-        // TODO Add columns to Table class
+        return userTabColumnsMap;
     }
 }
