@@ -1,5 +1,9 @@
 # oracle-dataonly-backup
 
+Oracle Database の、あるユーザが所有するテーブルのデータをテキストとしてバックアップするツールです。
+
+実行すると、そのままsqlldrに流し込めるcsvファイルとctlファイルが出力されます。
+
 ## 使用方法
 
 
